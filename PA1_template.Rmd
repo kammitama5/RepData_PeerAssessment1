@@ -1,3 +1,9 @@
+---
+output:
+  html_document:
+    fig_caption: yes
+    keep_md: yes
+---
 Reproducible Research
 =======================================
 
@@ -6,37 +12,134 @@ Reproducible Research
 [1] Ensure that the data is in your set working directory  
 [2] Load the data  
 
+```{r}
+options(scipen = 1)
+activity <- read.csv("activity.csv", colClasses = c("integer", "Date", "character"))
+activity$day <- factor(paste(substring(months(as.Date(activity$date)),0,3), 
+                      substring(as.Date  (activity$date), 9), sep=" ")) 
+tidyData <- na.omit(activity)
+head(tidyData)
+```
 
+```{r}
+names(activity)
+```
+
+```{r}
+library(lattice)
+```
 
 ##What is the Mean Total Number of Steps Taken Per Day?
 
 [1] Make a Histogram of the Total Number of Steps Taken Each Day.
 
-
+```{r fig.width=6, fig.height=6}
+tot_steps <- aggregate(tidyData$steps, list(tidyData$date), FUN="sum")
+names(tot_steps) <- c("date","total")
+tot_steps$date <- factor(paste(substring(months(as.Date(tot_steps$date)),0,3), 
+                      substring(as.Date  (tot_steps$date), 9), sep=" ")) 
+barplot(tot_steps$total, names.arg=tot_steps$date, xlab="Days", ylab="Total Steps", main="Total Steps Count Per Day", col="steelblue")
+```
 
 [1] Calculate mean total Number of steps taken per day.  
 
-
+```{r}
+print(round(mean(tot_steps$total)))  
+```
 
 [2] Calculate median total Number of Steps taken per Day.  
 
-
+```{r}
+print(median(tot_steps$total))
+```  
 ## What is the average daily activity pattern?
 
+```{r}
+activity_steps <- aggregate(tidyData$steps, list(as.numeric(tidyData$interval)), FUN="mean")
+names(activity_steps) <- c("interval","mean")
+plot(activity_steps, type="l", xlab="Interval", ylab="Number of Steps", main="Daily Activity Pattern", col=1)
+```
 
 
 ## Maximum number of steps for 5-minute interval
-
+```{r}
+maxI <- activity_steps[which.max(activity_steps$mean),]
+print(maxI)
+```
 
 #Imputing Missing Values
 
+```{r}
+missingSteps <- which(is.na(activity))
+print(length(missingSteps))
+```
+
+
+```{r fig.width=6, fig.height=6}
+steps.date <- aggregate(steps ~ date,activity,FUN = sum)
+nas <- is.na(activity$steps)
+activity <- activity [, c(1:3)]
+```
 
 [1] Make a histogram of the number of steps taken each day and Calculate and report the mean and median total number of steps taken per day. Do these values differ from the estimates from the first part of the assignment? What is the impact of imputing missing data on the estimates of the total daily number of steps?
 
+```{r fig.width=6, fig.height=6}
+newData <- activity
+for(i in 1:length(missingSteps)){
+    newData[missingSteps[i], 1] <- activity_steps[activity_steps$interval ==
+                                   newData[missingSteps[i],]$interval,]$mean
+}
+
+## Histogram of total Number of Steps per day
+new_steps <- aggregate(newData$steps, list(newData$date), FUN="sum")
+names(new_steps) <- c("date","total")
+new_steps$date <- factor(paste(substring(months(as.Date(new_steps$date)),0,3), 
+                      substring(as.Date  (new_steps$date), 9), sep=" ")) 
+barplot(new_steps$total, names.arg=new_steps$date, xlab="Days", ylab="Total Steps",
+        main="Total Steps Count Per Day (Without Missing Data)", col="steelblue")
+```
+
 [2] mean
+```{r}
+print(round(mean(new_steps$total)))
+```
 
 [3] median
 
+```{r}
+print(median(new_steps$total))
+```
+```{r}
+## Difference From TidyData Values
+print(mean(new_steps$total) - mean(tot_steps$total))
+```
+```{r}
+print(median(new_steps$total) - median(tot_steps$total))
+```
+
+```{r}
+head(newData)
+```
+```{r}
+newData$daysOfWeek <- factor(weekdays(newData$date))
+levels(newData$daysOfWeek)
+```
 
 [1] Make a panel plot (ie. type = "l") of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all weekday days or weekend days (y-axis)
 
+```{r}
+levels(newData$daysOfWeek) <- list(weekday = c("Monday", "Tuesday", "Wednesday", 
+                                               "Thursday", "Friday"),
+                                   weekend = c("Saturday", "Sunday"))
+table(newData$daysOfWeek)
+```
+
+```{r}
+library(lattice)
+meanSteps <- aggregate(newData$steps, list(as.numeric(newData$interval),newData$daysOfWeek),        FUN = "mean")
+names(meanSteps) <- c("interval","weekDays", "avgSteps")
+
+xyplot(meanSteps$avgSteps ~ meanSteps$interval | meanSteps$weekDays, 
+       layout = c(1, 2), type = "l", 
+       xlab = "Interval", ylab = "Number of steps")
+```
